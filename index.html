@@ -9,6 +9,7 @@
     <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
     <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.54.0/mapbox-gl.js'></script>
     <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.54.0/mapbox-gl.css' rel='stylesheet' />
+
     <style>
         body {
             margin: 0;
@@ -21,59 +22,108 @@
             bottom: 0;
             width: 100%;
         }
+
+        .distance-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1;
+        }
+
+        .distance-container>* {
+            background-color: rgba(0, 0, 0, 0.5);
+            color: #fff;
+            font-size: 16px;
+            line-height: 22px;
+            display: block;
+            margin: 0;
+            padding: 5px 10px;
+            border-radius: 3px;
+        }
     </style>
 </head>
 
 <body>
 
     <div id='map'></div>
+    <div id='distance' class='distance-container'></div>
+    <script src='https://api.mapbox.com/mapbox.js/plugins/turf/v2.0.2/turf.min.js'></script>
     <script>
-        mapboxgl.accessToken =
-            'pk.eyJ1Ijoic3VjcmV3YXIxMCIsImEiOiJjanY2cnZuc2kwM2h2M3lxN3cyYzVldmRoIn0.J65VYIzB8pYXc_HLTrp6NQ';
-        var map = new mapboxgl.Map({
-            container: 'map', // container id
-            //style: 'mapbox://styles/mapbox/cjaudgl840gn32rnrepcb9b9g', // stylesheet location
-            style: 'mapbox://styles/mapbox/outdoors-v11',
-            center: [-6.348307, 32.04052], // starting position [lng, lat]
-            zoom: 6 // starting zoom
-        });
+        const url =
+            'https://gist.githubusercontent.com/sucrewar/223730c5148c9463bbef10806572548f/raw/7017987eef390b35f453806fe886523e332ab213/map.geojson'
+        fetch(url)
+            .then(res => res.json())
+            .then((out) => {
+                const geojson = out
+                const distanceContainer = document.getElementById('distance');
+                mapboxgl.accessToken =
+                    'pk.eyJ1Ijoic3VjcmV3YXIxMCIsImEiOiJjanY2cnZuc2kwM2h2M3lxN3cyYzVldmRoIn0.J65VYIzB8pYXc_HLTrp6NQ';
+                var map = new mapboxgl.Map({
+                    container: 'map', // container id
+                    //style: 'mapbox://styles/mapbox/cjaudgl840gn32rnrepcb9b9g', // stylesheet location
+                    style: 'mapbox://styles/mapbox/outdoors-v11',
+                    center: [-6.348307, 32.04052], // starting position [lng, lat]
+                    zoom: 6 // starting zoom
+                });
 
 
-        map.on('load', function () {
-            var url =
-                'https://gist.githubusercontent.com/sucrewar/223730c5148c9463bbef10806572548f/raw/7017987eef390b35f453806fe886523e332ab213/map.geojson';
-            map.addSource('trip', {
-                type: 'geojson',
-                data: url
-            });
-            map.addLayer({
-                "id": "trip",
-                "type": "line",
-                "source": "trip",
-                "layout": {
-                    "line-join": "round",
-                    "line-cap": "round"
-                },
-                "paint": {
-                    "line-color": "#C73636",
-                    "line-width": 2
-                }
-            });
+                map.on('load', function () {
+                    /*map.addSource('trip', {
+                        type: 'geojson',
+                        data: url
+                    });*/
+                    map.addLayer({
+                        "id": "LineString",
+                        "type": "line",
+                        "source": {
+                            "type": "geojson",
+                            "data": geojson
+                        },
+                        "layout": {
+                            "line-join": "round",
+                            "line-cap": "round"
+                        },
+                        "paint": {
+                            "line-color": "#C73636",
+                            "line-width": 2
+                        }
+                    });
+                    // Geographic coordinates of the LineString
+                    var coordinates = geojson.features[0].geometry.coordinates;
 
-            map.addSource('dem', {
-                "type": "raster-dem",
-                "url": "mapbox://mapbox.terrain-rgb"
-            });
-            map.addLayer({
-                "id": "hillshading",
-                "source": "dem",
-                "type": "hillshade"
-                // insert below waterway-river-canal-shadow;
-                // where hillshading sits in the Mapbox Outdoors style
-            }, 'waterway-river-canal-shadow');
+                    // Pass the first coordinates in the LineString to `lngLatBounds` &
+                    // wrap each coordinate pair in `extend` to include them in the bounds
+                    // result. A variation of this technique could be applied to zooming
+                    // to the bounds of multiple Points or Polygon geomteries - it just
+                    // requires wrapping all the coordinates with the extend method.
+                    var bounds = coordinates.reduce(function (bounds, coord) {
+                        return bounds.extend(coord);
+                    }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
 
+                    map.fitBounds(bounds, {
+                        padding: 10
+                    });
 
-        });
+                    const line = turf.linestring(coordinates);
+                    const distance = 'Total distance: ' + turf.lineDistance(line).toLocaleString() + 'km';
+
+                    var value = document.createElement('pre');
+                    value.textContent = distance
+                    distanceContainer.appendChild(value);
+
+                    map.addSource('dem', {
+                        "type": "raster-dem",
+                        "url": "mapbox://mapbox.terrain-rgb"
+                    });
+                    map.addLayer({
+                        "id": "hillshading",
+                        "source": "dem",
+                        "type": "hillshade"
+                        // insert below waterway-river-canal-shadow;
+                        // where hillshading sits in the Mapbox Outdoors style
+                    }, 'waterway-river-canal-shadow');
+                });
+            }).catch(err => console.error(err));
     </script>
 
 </body>
