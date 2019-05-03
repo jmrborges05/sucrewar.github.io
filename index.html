@@ -9,7 +9,7 @@
     <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
     <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.54.0/mapbox-gl.js'></script>
     <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.54.0/mapbox-gl.css' rel='stylesheet' />
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/custom-elements/1.2.1/custom-elements.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -30,6 +30,17 @@
             z-index: 1;
         }
 
+        .chart-container {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1;
+            width: 40%;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 3px;
+        }
+
         .distance-container>* {
             background-color: rgba(0, 0, 0, 0.5);
             color: #fff;
@@ -47,15 +58,18 @@
 
     <div id='map'></div>
     <div id='distance' class='distance-container'></div>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <div id="chart_div" class='chart-container'></div>
     <script src='https://api.mapbox.com/mapbox.js/plugins/turf/v2.0.2/turf.min.js'></script>
     <script>
         const url =
-            'https://gist.githubusercontent.com/sucrewar/223730c5148c9463bbef10806572548f/raw/7017987eef390b35f453806fe886523e332ab213/map.geojson'
+            'https://gist.githubusercontent.com/sucrewar/223730c5148c9463bbef10806572548f/raw/6c55cbc29788ce6e2c1711eb9bb106016205fef4/map.geojson'
         fetch(url)
             .then(res => res.json())
             .then((out) => {
                 const geojson = out
                 const distanceContainer = document.getElementById('distance');
+                const chartContainer = document.getElementById('linechart')
                 mapboxgl.accessToken =
                     'pk.eyJ1Ijoic3VjcmV3YXIxMCIsImEiOiJjanY2cnZuc2kwM2h2M3lxN3cyYzVldmRoIn0.J65VYIzB8pYXc_HLTrp6NQ';
                 var map = new mapboxgl.Map({
@@ -88,9 +102,9 @@
                             "line-width": 2
                         }
                     });
+                    
                     // Geographic coordinates of the LineString
                     var coordinates = geojson.features[0].geometry.coordinates;
-
                     // Pass the first coordinates in the LineString to `lngLatBounds` &
                     // wrap each coordinate pair in `extend` to include them in the bounds
                     // result. A variation of this technique could be applied to zooming
@@ -111,6 +125,12 @@
                     value.textContent = distance
                     distanceContainer.appendChild(value);
 
+                    let values = []
+
+                    for (i = 0; i < coordinates.length; i++) {
+                        values.push([i, coordinates[i][2]])
+                    }
+
                     map.addSource('dem', {
                         "type": "raster-dem",
                         "url": "mapbox://mapbox.terrain-rgb"
@@ -122,10 +142,35 @@
                         // insert below waterway-river-canal-shadow;
                         // where hillshading sits in the Mapbox Outdoors style
                     }, 'waterway-river-canal-shadow');
+
+
+                    google.charts.load('current', {
+                        packages: ['corechart', 'line']
+                    });
+                    google.charts.setOnLoadCallback(drawLineColors);
+
+                    function drawLineColors() {
+                    var data = new google.visualization.DataTable();
+                    data.addColumn('number', '');
+                    data.addColumn('number', 'In altitude');
+
+                    data.addRows(values);
+
+                    var options = {
+                        vAxis: {
+                            title: 'Altitutde'
+                        },
+                        colors: ['#C73636'],
+                        title: 'Altitudes',
+                    };
+
+                    var chart = new google.visualization.LineChart(document.getElementById('chart_div'));
+                    chart.draw(data, options);
+                    }
                 });
+
             }).catch(err => console.error(err));
     </script>
-
 </body>
 
 </html>
